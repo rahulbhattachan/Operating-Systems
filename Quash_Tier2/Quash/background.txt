@@ -1,0 +1,94 @@
+#include <iostream>
+#include <vector>
+#include <sstream>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <cstring>
+#include <cstdlib>
+#include <map>
+
+using namespace std;
+
+vector<string> split(const string& s) {
+    vector<string> tokens;
+    stringstream ss(s);
+    string token;
+    while (ss >> token) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
+
+bool fileExists(const string& name) {
+    struct stat buffer;
+    return (stat(name.c_str(), &buffer) == 0);
+}
+
+int main() {
+    string input;
+    int jobID = 0;
+    map<pid_t, string> backgroundJobs;  // Map of PID to command
+
+    while (true) {
+        // Check if any background process has completed
+        for (auto it = backgroundJobs.begin(); it != backgroundJobs.end();) {
+            int status;
+            pid_t done = waitpid(it->first, &status, WNOHANG);
+            if (done > 0) {
+                cout << "Completed: [" << jobID << "] " << it->first << " " << it->second << endl;
+                it = backgroundJobs.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
+        cout << "[QUASH]$ ";
+        getline(cin, input);
+
+        if (input == "exit") {
+            break;
+        }
+
+        vector<string> tokens = split(input);
+        if (tokens.empty()) {
+            continue;
+        }
+
+        bool background = false;
+        if (tokens.back() == "&") {
+            background = true;
+            tokens.pop_back();
+        }
+
+        string cmd = tokens[0];
+        if (cmd.find('/') == string::npos && fileExists(cmd)) {
+            cmd = "./" + cmd;
+        }
+        tokens[0] = cmd;
+
+        pid_t pid = fork();
+        if (pid == 0) {
+            vector<char*> args;
+            for (const string& token : tokens) {
+                args.push_back(const_cast<char*>(token.c_str()));
+            }
+            args.push_back(nullptr);
+            execvp(args[0], args.data());
+            perror("execvp");
+            exit(EXIT_FAILURE);
+        } else if (pid < 0) {
+            perror("fork");
+        } else {
+            if (background) {
+                cout << "Background job started: [" << ++jobID << "] " << pid << " " << input << endl;
+                backgroundJobs[pid] = input;
+            } else {
+                int status;
+                waitpid(pid, &status, 0);
+            }
+        }
+    }
+    return 0;
+}

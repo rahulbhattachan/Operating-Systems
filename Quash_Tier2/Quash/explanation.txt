@@ -1,0 +1,7 @@
+Name: Rahul Bhattachan
+Ku ID:3050953
+
+
+I was able to get everything up to tier2 testing wroking but was unable to get any of the tier 3 processes working. In quash.txt I have a quash that can run background functions but I was unable to use that code in conjuctioin with my main quash code.
+
+I coded my quash in c++ and did everything myself I had no Partner.
